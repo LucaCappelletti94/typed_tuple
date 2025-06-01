@@ -1,0 +1,11 @@
+[package]
+name = "typed_tuple"
+authors = ["Christopher Edward Dawn"]
+version = "0.1.0"
+edition = "2024"
+description = "Type based operations on primitive tuple elements."
+readme = "README.md"
+repository = "https://github.com/cedtwo/typed_tuple.git"
+license = "MIT OR Apache-2.0"
+keywords = ["tuple", "type", "typed", "heterogenous"]
+categories = ["data-structures", "rust-patterns"]
