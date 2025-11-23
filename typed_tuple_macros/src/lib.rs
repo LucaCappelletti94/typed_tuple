@@ -13,12 +13,29 @@ pub fn generate_typed_tuple_impls(input: TokenStream) -> TokenStream {
 
     let mut impls = Vec::new();
 
+    // Generate the marker types for each index, since at the time of writing
+    // Rust does not support const generics in traits fully.
+    // See: <https://github.com/rust-lang/rust/issues/76560>
+
+    let mut index_idents = Vec::new();
+    for index in 0..max_size {
+        let marker_ident = quote::format_ident!("TupleIndex{}", index);
+        index_idents.push(marker_ident.clone());
+        let documentation = format!("Marker type for tuple index {}", index);
+        impls.push(quote! {
+            #[doc = #documentation]
+            pub struct #marker_ident;
+        });
+    }
+
     // Generate implementation for each tuple size
     for size in 1..=max_size {
         let type_params: Vec<_> = (0..size).map(|i| quote::format_ident!("T{}", i)).collect();
 
         // Generate implementation for each index in the tuple
-        for (index, target_type) in type_params.iter().enumerate() {
+        for (target_type, (index, index_marker)) in
+            type_params.iter().zip(index_idents.iter().enumerate())
+        {
             let index_lit = syn::Index::from(index);
 
             // Build type and index lists for pop, split_at
@@ -32,16 +49,16 @@ pub fn generate_typed_tuple_impls(input: TokenStream) -> TokenStream {
             let split_right_indices = ((index + 1)..size).map(syn::Index::from);
 
             impls.push(quote! {
-                impl<#(#type_params),*> TypedTuple<#index, #target_type> for (#(#type_params,)*) {
+                impl<#(#type_params),*> TypedTuple<#index_marker, #target_type> for (#(#type_params,)*) {
                     type PopOutput = (#(#pop_output_types,)*);
                     type SplitLeft = (#(#split_left_types,)*);
                     type SplitRight = (#(#split_right_types,)*);
+                    const INDEX: usize = #index;
 
                     #[inline]
                     fn get(&self) -> &#target_type {
                         &self.#index_lit
                     }
-
                     #[inline]
                     fn get_mut(&mut self) -> &mut #target_type {
                         &mut self.#index_lit
@@ -56,20 +73,6 @@ pub fn generate_typed_tuple_impls(input: TokenStream) -> TokenStream {
                     #[inline]
                     fn pop(self) -> (#target_type, Self::PopOutput) {
                         (self.#index_lit, (#(self.#remaining_indices,)*))
-                    }
-                    #[inline]
-                    fn swap<const OTHER_INDEX: usize>(&mut self)
-                    where
-                        Self: TypedTuple<OTHER_INDEX, #target_type>
-                    {
-                        if #index != OTHER_INDEX {
-                            unsafe {
-                                let ptr = self as *mut Self;
-                                let field1 = &mut (*ptr).#index_lit;
-                                let field2 = <Self as TypedTuple<OTHER_INDEX, #target_type>>::get_mut(&mut *ptr);
-                                core::mem::swap(field1, field2);
-                            }
-                        }
                     }
                     #[inline]
                     fn split_at(self) -> (Self::SplitLeft, Self::SplitRight) {

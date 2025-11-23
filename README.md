@@ -40,7 +40,7 @@ assert_eq!(tuple, (84, 2.718, "hello".to_string()));
 ### Advanced Operations
 
 ```rust
-use typed_tuple::TypedTuple;
+use typed_tuple::*;
 
 let tuple = (1u8, 2u16, 3u32, 4u64);
 
@@ -51,12 +51,12 @@ assert_eq!(rest, (1u8, 2u16, 4u64));
 
 // Swap elements at different indices (same type)
 let mut tuple = (1u32, "hello", 2u32, 'x', 3u32);
-TypedTuple::<0, u32>::swap::<2>(&mut tuple);
+TypedTuple::<TupleIndex0, u32>::swap::<TupleIndex2>(&mut tuple);
 assert_eq!(tuple, (2u32, "hello", 1u32, 'x', 3u32));
 
 // Split tuple at a specific index
 let tuple = (1u8, 2u16, 3u32, 4u64, 5i8);
-let (left, right) = TypedTuple::<2, u32>::split_at(tuple);
+let (left, right) = TypedTuple::<TupleIndex2, u32>::split_at(tuple);
 assert_eq!(left, (1u8, 2u16, 3u32));
 assert_eq!(right, (4u64, 5i8));
 
@@ -67,9 +67,54 @@ assert_eq!(value, "hello");
 assert_eq!(tuple, (String::new(), 42, 3.14));
 ```
 
+### Using TupleKey for Blanket Implementations
+
+The `TupleKey` trait enables defining blanket implementations that work with different tuple structures. You can use custom marker types to create semantic, type-safe APIs that work across various tuple layouts.
+
+```rust
+use typed_tuple::{TupleKey, TypedTuple, TupleIndex0, TupleIndex1, TupleIndex2};
+
+// Define a marker type for semantic access
+struct AgeMarker;
+
+// Create a trait that uses the marker
+trait GetAge {
+    fn age(&self) -> u8;
+}
+
+// Blanket implementation for any tuple that can be keyed by AgeMarker
+impl<T> GetAge for T
+where
+    Self: TypedTuple<<AgeMarker as TupleKey<Self>>::Idx, u8>,
+    AgeMarker: TupleKey<Self>,
+{
+    fn age(&self) -> u8 {
+        *self.get()
+    }
+}
+
+// Map the marker to different indices for different tuple structures
+impl TupleKey<(u8, f64, &str)> for AgeMarker {
+    type Idx = TupleIndex0;
+}
+
+impl TupleKey<(&str, f64, u8)> for AgeMarker {
+    type Idx = TupleIndex2;
+}
+
+impl TupleKey<(&str, u8, f64)> for AgeMarker {
+    type Idx = TupleIndex1;
+}
+
+// Now you can call .age() on different tuple structures
+assert_eq!((67u8, 3.5, "Alice").age(), 67u8);
+assert_eq!(("Bob", 2.1, 42u8).age(), 42u8);
+assert_eq!(("Charlie", 56u8, 1.8).age(), 56u8);
+```
+
 ## Limitations
 
-- Fields of the same type must still specify a constant index. This can be specified with, for example, `TypedTuple::<1, _>::get(&tuple)` where `1` is the element index, however this offers no advantage over simply calling `tuple.1`.
+- Fields of the same type must still specify an index type. This can be specified with, for example, `TypedTuple::<TupleIndex1, _>::get(&tuple)` where `TupleIndex1` is the element index type, however this offers no advantage over simply calling `tuple.1`.
 - `typed_tuple` can impact readability. Types should be explicit if not immediately obvious. Prefer `let a: usize = tuple.get()` over `let a = tuple.get()`.
 
 ## Features
