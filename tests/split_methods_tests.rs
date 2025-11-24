@@ -79,38 +79,6 @@ fn test_split_right_last() {
 }
 
 #[test]
-fn test_split_inclusive_basic() {
-    let tuple = (1u8, 2u16, 3u32, 4u64, 5i8);
-    let (left, right) = TypedTuple::<TupleIndex2, u32>::split_inclusive(tuple);
-    assert_eq!(left, (1u8, 2u16, 3u32));
-    assert_eq!(right, (3u32, 4u64, 5i8));
-}
-
-#[test]
-fn test_split_inclusive_first() {
-    let tuple = (1u8, 2u16, 3u32);
-    let (left, right) = TypedTuple::<TupleIndex0, u8>::split_inclusive(tuple);
-    assert_eq!(left, (1u8,));
-    assert_eq!(right, (1u8, 2u16, 3u32));
-}
-
-#[test]
-fn test_split_inclusive_last() {
-    let tuple = (1u8, 2u16, 3u32);
-    let (left, right) = TypedTuple::<TupleIndex2, u32>::split_inclusive(tuple);
-    assert_eq!(left, (1u8, 2u16, 3u32));
-    assert_eq!(right, (3u32,));
-}
-
-#[test]
-fn test_split_inclusive_with_strings() {
-    let tuple = ("hello".to_string(), 42, "world".to_string());
-    let (left, right) = TypedTuple::<TupleIndex0, String>::split_inclusive(tuple);
-    assert_eq!(left, ("hello".to_string(),));
-    assert_eq!(right, ("hello".to_string(), 42, "world".to_string()));
-}
-
-#[test]
 fn test_all_split_methods_together() {
     // Test that all four methods work correctly on the same tuple structure
     let tuple1 = (1u8, 2u16, 3u32, 4u64, 5i8);
@@ -128,11 +96,6 @@ fn test_all_split_methods_together() {
     let (left_r, right_r) = TypedTuple::<TupleIndex2, u32>::split_right(tuple3);
     assert_eq!(left_r, (1u8, 2u16));
     assert_eq!(right_r, (3u32, 4u64, 5i8));
-
-    let tuple4 = (1u8, 2u16, 3u32, 4u64, 5i8);
-    let (left_i, right_i) = TypedTuple::<TupleIndex2, u32>::split_inclusive(tuple4);
-    assert_eq!(left_i, (1u8, 2u16, 3u32));
-    assert_eq!(right_i, (3u32, 4u64, 5i8));
 }
 
 #[test]
@@ -152,10 +115,5 @@ fn test_split_single_element() {
     let tuple = (42u32,);
     let (left, right) = TypedTuple::<TupleIndex0, u32>::split_right(tuple);
     assert_eq!(left, ());
-    assert_eq!(right, (42u32,));
-
-    let tuple = (42u32,);
-    let (left, right) = TypedTuple::<TupleIndex0, u32>::split_inclusive(tuple);
-    assert_eq!(left, (42u32,));
     assert_eq!(right, (42u32,));
 }

@@ -1,27 +1,32 @@
-//! Proc macro to generate TypedTuple implementations for tuples up to a specified size.
+//! Proc macros to generate TypedTuple implementations for tuples up to a
+//! specified size.
+//!
+//! This crate is split into multiple macros to avoid hitting token limits:
+//! - `generate_index_markers!()` - Generates TupleIndexN marker types
+//! - `generate_last_index_impls!()` - Generates LastIndex trait implementations
+//! - `generate_typed_tuple_impls!()` - Generates TypedTuple trait
+//!   implementations
+//!
+//! The maximum tuple size is controlled by the `len_128` feature flag:
+//! - Without feature: supports tuples up to 64 elements
+//! - With `len_128` feature: supports tuples up to 128 elements
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, LitInt};
 
-/// Generates TypedTuple implementations for tuples up to the specified size.
-///
-/// This proc macro generates all the necessary trait implementations including
-/// the `pop` method for each tuple size and index combination.
+/// Determine the maximum tuple size based on the len_128 feature
+#[cfg(not(feature = "len_128"))]
+const MAX_SIZE: usize = 64;
+
+#[cfg(feature = "len_128")]
+const MAX_SIZE: usize = 128;
+
+/// Generates index marker types (TupleIndex0, TupleIndex1, etc.)
 #[proc_macro]
-pub fn generate_typed_tuple_impls(input: TokenStream) -> TokenStream {
-    let max_size = parse_macro_input!(input as LitInt);
-    let max_size: usize = max_size.base10_parse().expect("Expected a number");
-
+pub fn generate_index_markers(_input: TokenStream) -> TokenStream {
     let mut impls = Vec::new();
 
-    // Generate the marker types for each index, since at the time of writing
-    // Rust does not support const generics in traits fully.
-    // See: <https://github.com/rust-lang/rust/issues/76560>
-
-    let mut index_idents = Vec::new();
-    for index in 0..max_size {
+    for index in 0..MAX_SIZE {
         let marker_ident = quote::format_ident!("TupleIndex{}", index);
-        index_idents.push(marker_ident.clone());
         let documentation = format!("Marker type for tuple index {}", index);
         impls.push(quote! {
             #[doc = #documentation]
@@ -33,47 +38,114 @@ pub fn generate_typed_tuple_impls(input: TokenStream) -> TokenStream {
         });
     }
 
-    // Generate implementation for each tuple size
-    for size in 1..=max_size {
-        let type_params: Vec<_> = (0..size).map(|i| quote::format_ident!("T{}", i)).collect();
+    quote! {
+        #(#impls)*
+    }
+    .into()
+}
 
-        // Generate LastIndex implementation for this tuple type
+/// Generates LastIndex trait implementations for all tuple sizes
+#[proc_macro]
+pub fn generate_last_index_impls(_input: TokenStream) -> TokenStream {
+    let mut impls = Vec::new();
+
+    for size in 1..=MAX_SIZE {
+        let type_params: Vec<_> = (0..size).map(|i| quote::format_ident!("T{}", i)).collect();
         let last_index = size - 1;
-        let last_marker = &index_idents[last_index];
+        let last_marker = quote::format_ident!("TupleIndex{}", last_index);
+
         impls.push(quote! {
             impl<#(#type_params),*> LastIndex for (#(#type_params,)*) {
                 type Last = #last_marker;
             }
         });
+    }
+
+    quote! {
+        #(#impls)*
+    }
+    .into()
+}
+
+/// Generates ChainTuple trait implementations for all tuple size combinations
+#[proc_macro]
+pub fn generate_chain_tuple_impls(_input: TokenStream) -> TokenStream {
+    let mut impls = Vec::new();
+
+    // Generate ChainTuple implementations for all combinations of tuple sizes
+    for left_size in 0..=MAX_SIZE {
+        for right_size in 0..=MAX_SIZE {
+            let total_size = left_size + right_size;
+            if total_size > MAX_SIZE {
+                continue;
+            }
+
+            let left_params: Vec<_> =
+                (0..left_size).map(|i| quote::format_ident!("L{}", i)).collect();
+            let right_params: Vec<_> =
+                (0..right_size).map(|i| quote::format_ident!("R{}", i)).collect();
+
+            let left_tuple = if left_size == 0 {
+                quote! { () }
+            } else {
+                quote! { (#(#left_params,)*) }
+            };
+
+            let right_tuple = if right_size == 0 {
+                quote! { () }
+            } else {
+                quote! { (#(#right_params,)*) }
+            };
+
+            let output_tuple = if total_size == 0 {
+                quote! { () }
+            } else {
+                quote! { (#(#left_params,)* #(#right_params,)*) }
+            };
+
+            impls.push(quote! {
+                impl<#(#left_params,)* #(#right_params,)*> ChainTuple<#right_tuple> for #left_tuple {
+                    type Output = #output_tuple;
+                }
+            });
+        }
+    }
+
+    quote! {
+        #(#impls)*
+    }
+    .into()
+}
+
+/// Generates TypedTuple trait implementations for all tuple sizes and indices
+#[proc_macro]
+pub fn generate_typed_tuple_impls(_input: TokenStream) -> TokenStream {
+    let mut impls = Vec::new();
+
+    for size in 1..=MAX_SIZE {
+        let type_params: Vec<_> = (0..size).map(|i| quote::format_ident!("T{}", i)).collect();
 
         // Generate implementation for each index in the tuple
-        for (target_type, (index, index_marker)) in
-            type_params.iter().zip(index_idents.iter().enumerate())
-        {
+        for index in 0..size {
+            let target_type = &type_params[index];
+            let index_marker = quote::format_ident!("TupleIndex{}", index);
             let index_lit = syn::Index::from(index);
 
-            // Build type and index lists for pop and split operations
-            let pop_output_types =
-                type_params.iter().enumerate().filter(|(i, _)| *i != index).map(|(_, t)| t);
-            let remaining_indices = (0..size).filter(|i| *i != index).map(syn::Index::from);
+            // Build type lists for split operations
+            let split_left_exclusive_types: Vec<_> = type_params.iter().take(index).collect();
+            let split_right_exclusive_types: Vec<_> = type_params.iter().skip(index + 1).collect();
 
-            let split_left_exclusive_types = type_params.iter().take(index);
-            let split_left_inclusive_types = type_params.iter().take(index + 1);
-            let split_right_exclusive_types = type_params.iter().skip(index + 1);
-            let split_right_inclusive_types = type_params.iter().skip(index);
-            
             let split_left_exclusive_indices: Vec<_> = (0..index).map(syn::Index::from).collect();
-            let split_left_inclusive_indices: Vec<_> = (0..=index).map(syn::Index::from).collect();
-            let split_right_exclusive_indices: Vec<_> = ((index + 1)..size).map(syn::Index::from).collect();
-            let split_right_inclusive_indices: Vec<_> = (index..size).map(syn::Index::from).collect();
+            let split_right_exclusive_indices: Vec<_> =
+                ((index + 1)..size).map(syn::Index::from).collect();
 
             impls.push(quote! {
                 impl<#(#type_params),*> TypedTuple<#index_marker, #target_type> for (#(#type_params,)*) {
-                    type PopOutput = (#(#pop_output_types,)*);
+                    type PopOutput = <Self::SplitLeftExclusive as ChainTuple<Self::SplitRightExclusive>>::Output;
                     type SplitLeftExclusive = (#(#split_left_exclusive_types,)*);
-                    type SplitLeftInclusive = (#(#split_left_inclusive_types,)*);
+                    type SplitLeftInclusive = <Self::SplitLeftExclusive as ChainTuple<(#target_type,)>>::Output;
                     type SplitRightExclusive = (#(#split_right_exclusive_types,)*);
-                    type SplitRightInclusive = (#(#split_right_inclusive_types,)*);
+                    type SplitRightInclusive = <(#target_type,) as ChainTuple<Self::SplitRightExclusive>>::Output;
 
                     #[inline]
                     fn get(&self) -> &#target_type {
@@ -85,33 +157,21 @@ pub fn generate_typed_tuple_impls(input: TokenStream) -> TokenStream {
                     }
                     #[inline]
                     fn pop(self) -> (#target_type, Self::PopOutput) {
-                        (self.#index_lit, (#(self.#remaining_indices,)*))
-                    }
-                    #[inline]
-                    fn split_exclusive(self) -> (Self::SplitLeftExclusive, #target_type, Self::SplitRightExclusive) {
-                        ((#(self.#split_left_exclusive_indices,)*), self.#index_lit, (#(self.#split_right_exclusive_indices,)*))
+                        (self.#index_lit, (#(self.#split_left_exclusive_indices,)* #(self.#split_right_exclusive_indices,)*))
                     }
                     #[inline]
                     fn split_left(self) -> (Self::SplitLeftInclusive, Self::SplitRightExclusive) {
-                        ((#(self.#split_left_inclusive_indices,)*), (#(self.#split_right_exclusive_indices,)*))
+                        ((#(self.#split_left_exclusive_indices,)* self.#index_lit,), (#(self.#split_right_exclusive_indices,)*))
                     }
                     #[inline]
                     fn split_right(self) -> (Self::SplitLeftExclusive, Self::SplitRightInclusive) {
-                        ((#(self.#split_left_exclusive_indices,)*), (#(self.#split_right_inclusive_indices,)*))
-                    }
-                    #[inline]
-                    fn split_inclusive(self) -> (Self::SplitLeftInclusive, Self::SplitRightInclusive)
-                    where
-                        #target_type: Clone
-                    {
-                        let cloned = self.#index_lit.clone();
-                        ((#(self.#split_left_inclusive_indices,)*), (cloned, #(self.#split_right_exclusive_indices,)*))
+                        ((#(self.#split_left_exclusive_indices,)*), (self.#index_lit, #(self.#split_right_exclusive_indices,)*))
                     }
                 }
             });
         }
     }
-
+    
     quote! {
         #(#impls)*
     }

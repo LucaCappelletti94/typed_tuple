@@ -153,17 +153,6 @@ fn test_last_split_right() {
 }
 
 #[test]
-fn test_last_split_inclusive() {
-    type TupleType = (u8, u16, u32, u64);
-    type LastIdx = <TupleType as LastIndex>::Last;
-
-    let tuple: TupleType = (1, 2, 3, 4);
-    let (left, right) = TypedTuple::<LastIdx, u64>::split_inclusive(tuple);
-    assert_eq!(left, (1u8, 2u16, 3u32, 4u64));
-    assert_eq!(right, (4u64,));
-}
-
-#[test]
 fn test_last_with_different_tuple_sizes() {
     // Test that LastIndex adapts to different tuple sizes
     type T1 = (i32,);
@@ -251,10 +240,5 @@ fn test_last_split_at_extension_methods() {
     let tuple: TupleType = (1, 2, 3, 4);
     let (left, right) = tuple.split_right_at::<LastIdx>();
     assert_eq!(left, (1u8, 2u16, 3u32));
-    assert_eq!(right, (4u64,));
-
-    let tuple: TupleType = (1, 2, 3, 4);
-    let (left, right) = tuple.split_inclusive_at::<LastIdx>();
-    assert_eq!(left, (1u8, 2u16, 3u32, 4u64));
     assert_eq!(right, (4u64,));
 }
