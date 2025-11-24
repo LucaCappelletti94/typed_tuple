@@ -86,6 +86,46 @@ assert_eq!(value, "hello");
 assert_eq!(tuple, (String::new(), 42, 3.14));
 ```
 
+### Using LastIndex to Access the Last Element
+
+The `LastIndex` trait provides a type-safe way to access the last element of any tuple, regardless of its size. This is particularly useful when working with generic code.
+
+```rust
+use typed_tuple::*;
+
+// Define tuple types
+type Tuple2 = (u8, u16);
+type Tuple5 = (u8, u16, u32, u64, i8);
+
+// Get the index marker for the last element
+type Last2 = <Tuple2 as LastIndex>::Last;
+type Last5 = <Tuple5 as LastIndex>::Last;
+
+// Access last elements using the markers
+let tuple2: Tuple2 = (1, 2);
+let last: &u16 = TypedTuple::<Last2, u16>::get(&tuple2);
+assert_eq!(*last, 2u16);
+
+let tuple5: Tuple5 = (1, 2, 3, 4, 5);
+let last: &i8 = TypedTuple::<Last5, i8>::get(&tuple5);
+assert_eq!(*last, 5i8);
+
+// All operations work with LastIndex
+type Tuple3 = (u8, u16, u32);
+type Last3 = <Tuple3 as LastIndex>::Last;
+
+let mut tuple: Tuple3 = (1, 2, 3);
+TypedTuple::<Last3, u32>::apply(&mut tuple, |x| *x *= 10);
+assert_eq!(tuple, (1u8, 2u16, 30u32));
+
+// Pop the last element
+let tuple: (u8, u16, u32, u64) = (1, 2, 3, 4);
+type LastIdx = <(u8, u16, u32, u64) as LastIndex>::Last;
+let (last, rest) = TypedTuple::<LastIdx, u64>::pop(tuple);
+assert_eq!(last, 4u64);
+assert_eq!(rest, (1u8, 2u16, 3u32));
+```
+
 ### Using TupleKey for Blanket Implementations
 
 The `TupleKey` trait enables defining blanket implementations that work with different tuple structures. You can use custom marker types to create semantic, type-safe APIs that work across various tuple layouts.

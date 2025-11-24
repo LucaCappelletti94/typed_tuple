@@ -37,6 +37,15 @@ pub fn generate_typed_tuple_impls(input: TokenStream) -> TokenStream {
     for size in 1..=max_size {
         let type_params: Vec<_> = (0..size).map(|i| quote::format_ident!("T{}", i)).collect();
 
+        // Generate LastIndex implementation for this tuple type
+        let last_index = size - 1;
+        let last_marker = &index_idents[last_index];
+        impls.push(quote! {
+            impl<#(#type_params),*> LastIndex for (#(#type_params,)*) {
+                type Last = #last_marker;
+            }
+        });
+
         // Generate implementation for each index in the tuple
         for (target_type, (index, index_marker)) in
             type_params.iter().zip(index_idents.iter().enumerate())
