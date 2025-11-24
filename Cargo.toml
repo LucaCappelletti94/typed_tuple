@@ -17,7 +17,7 @@ len_128 = []
 [dependencies]
 typed_tuple_macros = { path = "typed_tuple_macros" }
 
-[workspace.lints.rust]
+[lints.rust]
 missing_docs = "forbid"
 unused_macro_rules = "forbid"
 unconditional_recursion = "forbid"
@@ -26,7 +26,7 @@ unused_import_braces = "forbid"
 unused_must_use = "forbid"
 deprecated = "deny"
 
-[workspace.lints.clippy]
+[lints.clippy]
 doc_markdown = "allow"
 clone_on_copy = "forbid"
 pedantic = { level = "deny", priority = -1 }

@@ -1,3 +1,5 @@
+//! Tests for the pop method on tuples.
+
 use typed_tuple::*;
 
 #[test]
@@ -20,7 +22,10 @@ fn test_pop_middle_element() {
 fn test_pop_last_element() {
     let tuple = ("hello", 42, 2.5);
     let (val, rest) = TypedTuple::<TupleIndex2, _>::pop(tuple);
-    assert_eq!(val, 2.5);
+    #[allow(clippy::float_cmp)]
+    {
+        assert_eq!(val, 2.5);
+    }
     assert_eq!(rest, ("hello", 42));
 }
 

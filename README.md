@@ -54,11 +54,30 @@ let mut tuple = (1u32, "hello", 2u32, 'x', 3u32);
 TypedTuple::<TupleIndex0, u32>::swap::<TupleIndex2>(&mut tuple);
 assert_eq!(tuple, (2u32, "hello", 1u32, 'x', 3u32));
 
-// Split tuple at a specific index
+// Split tuple exclusively (element separated)
 let tuple = (1u8, 2u16, 3u32, 4u64, 5i8);
-let (left, right) = TypedTuple::<TupleIndex2, u32>::split_at(tuple);
+let (left, element, right) = TypedTuple::<TupleIndex2, u32>::split_exclusive(tuple);
+assert_eq!(left, (1u8, 2u16));
+assert_eq!(element, 3u32);
+assert_eq!(right, (4u64, 5i8));
+
+// Split tuple with element on left
+let tuple = (1u8, 2u16, 3u32, 4u64, 5i8);
+let (left, right) = TypedTuple::<TupleIndex2, u32>::split_left(tuple);
 assert_eq!(left, (1u8, 2u16, 3u32));
 assert_eq!(right, (4u64, 5i8));
+
+// Split tuple with element on right
+let tuple = (1u8, 2u16, 3u32, 4u64, 5i8);
+let (left, right) = TypedTuple::<TupleIndex2, u32>::split_right(tuple);
+assert_eq!(left, (1u8, 2u16));
+assert_eq!(right, (3u32, 4u64, 5i8));
+
+// Split tuple with element on both sides (requires Clone)
+let tuple = (1u8, 2u16, 3u32, 4u64, 5i8);
+let (left, right) = TypedTuple::<TupleIndex2, u32>::split_inclusive(tuple);
+assert_eq!(left, (1u8, 2u16, 3u32));
+assert_eq!(right, (3u32, 4u64, 5i8));
 
 // Take element, replacing with default
 let mut tuple = (String::from("hello"), 42i32, 3.14f64);

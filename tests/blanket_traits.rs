@@ -1,3 +1,5 @@
+//! Tests for blanket trait implementations using TypedTuple.
+
 use typed_tuple::{TupleIndex0, TupleIndex1, TupleIndex2, TypedTuple};
 
 // Test custom trait with blanket implementation using TypedTuple

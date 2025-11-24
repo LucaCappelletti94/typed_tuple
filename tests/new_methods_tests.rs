@@ -1,3 +1,5 @@
+//! Tests for new methods including replace, swap, split, and take.
+
 use typed_tuple::*;
 
 #[test]
@@ -75,7 +77,7 @@ fn test_take_number() {
 #[test]
 fn test_split_at_first() {
     let tuple = ("hello", 42, 2.5, 'x', true);
-    let (left, right) = TypedTuple::<TupleIndex0, &str>::split_at(tuple);
+    let (left, right) = TypedTuple::<TupleIndex0, &str>::split_left(tuple);
     assert_eq!(left, ("hello",));
     assert_eq!(right, (42, 2.5, 'x', true));
 }
@@ -83,7 +85,7 @@ fn test_split_at_first() {
 #[test]
 fn test_split_at_middle() {
     let tuple = (1u8, 2u16, 3u32, 4u64, 5i8);
-    let (left, right) = TypedTuple::<TupleIndex2, u32>::split_at(tuple);
+    let (left, right) = TypedTuple::<TupleIndex2, u32>::split_left(tuple);
     assert_eq!(left, (1u8, 2u16, 3u32));
     assert_eq!(right, (4u64, 5i8));
 }
@@ -91,7 +93,7 @@ fn test_split_at_middle() {
 #[test]
 fn test_split_at_last() {
     let tuple = ("a", 1, "b", 2, "c");
-    let (left, right) = TypedTuple::<TupleIndex4, &str>::split_at(tuple);
+    let (left, right) = TypedTuple::<TupleIndex4, &str>::split_left(tuple);
     assert_eq!(left, ("a", 1, "b", 2, "c"));
     assert_eq!(right, ());
 }
@@ -99,12 +101,12 @@ fn test_split_at_last() {
 #[test]
 fn test_split_two_element() {
     let tuple = (1u8, 2u16);
-    let (left, right) = TypedTuple::<TupleIndex0, u8>::split_at(tuple);
+    let (left, right) = TypedTuple::<TupleIndex0, u8>::split_left(tuple);
     assert_eq!(left, (1u8,));
     assert_eq!(right, (2u16,));
 
     let tuple = (1u8, 2u16);
-    let (left, right) = TypedTuple::<TupleIndex1, u16>::split_at(tuple);
+    let (left, right) = TypedTuple::<TupleIndex1, u16>::split_left(tuple);
     assert_eq!(left, (1u8, 2u16));
     assert_eq!(right, ());
 }
@@ -123,7 +125,7 @@ fn test_combined_operations() {
     assert_eq!(tuple, (4u8, 2u16, 99u32, 1u8, 5u16));
 
     // Split it
-    let (left, right) = TypedTuple::<TupleIndex2, u32>::split_at(tuple);
+    let (left, right) = TypedTuple::<TupleIndex2, u32>::split_left(tuple);
     assert_eq!(left, (4u8, 2u16, 99u32));
     assert_eq!(right, (1u8, 5u16));
 }

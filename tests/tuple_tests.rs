@@ -1,3 +1,5 @@
+//! Basic tests for TypedTuple functionality.
+
 use typed_tuple::*;
 
 #[test]

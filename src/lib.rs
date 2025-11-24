@@ -64,10 +64,18 @@ pub trait TupleKey<Marker> {
 pub trait TypedTuple<Idx, T> {
     /// The type of the remaining tuple after popping element of type `T`.
     type PopOutput;
-    /// The type of the left tuple when splitting at [.., INDEX].
-    type SplitLeft: TypedTuple<Idx, T>;
-    /// The type of the right tuple when splitting at (INDEX, ..].
-    type SplitRight;
+    /// The type of the left tuple when splitting exclusively (excludes element
+    /// at INDEX): [.., INDEX).
+    type SplitLeftExclusive;
+    /// The type of the left tuple when splitting inclusively (includes element
+    /// at INDEX): [.., INDEX].
+    type SplitLeftInclusive: TypedTuple<Idx, T>;
+    /// The type of the right tuple when splitting exclusively (excludes element
+    /// at INDEX): (INDEX, ..].
+    type SplitRightExclusive;
+    /// The type of the right tuple when splitting inclusively (includes element
+    /// at INDEX): [INDEX, ..].
+    type SplitRightInclusive: TypedTuple<TupleIndex0, T>;
     /// The associated index.
     const INDEX: usize;
 
@@ -230,29 +238,92 @@ pub trait TypedTuple<Idx, T> {
         core::mem::take(self.get_mut())
     }
 
-    /// Splits the tuple at INDEX (inclusive), returning two tuples.
-    ///
-    /// The element at INDEX is included in the left tuple.
+    /// Splits the tuple exclusively at INDEX, returning the element and the
+    /// surrounding tuples.
     ///
     /// # Returns
     ///
-    /// A tuple containing (left_tuple, right_tuple) where left_tuple contains
-    /// elements from index 0 to INDEX (inclusive), and right_tuple contains
-    /// the remaining elements. The left tuple has length
-    /// INDEX + 1, and the right tuple has length total_length - (INDEX + 1).
-    /// The left tuple will `[.., INDEX]` and the right tuple will be
-    /// `(INDEX, ..]`, or analogously, `[INDEX + 1, ..]`.
+    /// A tuple containing (left_exclusive, element, right_exclusive) where:
+    /// - `left_exclusive` contains elements [0..INDEX)
+    /// - `element` is the element at INDEX
+    /// - `right_exclusive` contains elements (INDEX..)
     ///
     /// # Example
     ///
     /// ```rust
     /// # use typed_tuple::*;
     /// let tuple = (1u8, 2u16, 3u32, 4u64, 5i8);
-    /// let (left, right) = TypedTuple::<TupleIndex2, u32>::split_at(tuple);
+    /// let (left, element, right) = TypedTuple::<TupleIndex2, u32>::split_exclusive(tuple);
+    /// assert_eq!(left, (1u8, 2u16));
+    /// assert_eq!(element, 3u32);
+    /// assert_eq!(right, (4u64, 5i8));
+    /// ```
+    fn split_exclusive(self) -> (Self::SplitLeftExclusive, T, Self::SplitRightExclusive);
+
+    /// Splits the tuple at INDEX (inclusive left), returning two tuples.
+    ///
+    /// The element at INDEX is included in the left tuple.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing (left_inclusive, right_exclusive) where:
+    /// - `left_inclusive` contains elements [0..=INDEX]
+    /// - `right_exclusive` contains elements (INDEX..)
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use typed_tuple::*;
+    /// let tuple = (1u8, 2u16, 3u32, 4u64, 5i8);
+    /// let (left, right) = TypedTuple::<TupleIndex2, u32>::split_left(tuple);
     /// assert_eq!(left, (1u8, 2u16, 3u32));
     /// assert_eq!(right, (4u64, 5i8));
     /// ```
-    fn split_at(self) -> (Self::SplitLeft, Self::SplitRight);
+    fn split_left(self) -> (Self::SplitLeftInclusive, Self::SplitRightExclusive);
+
+    /// Splits the tuple at INDEX (inclusive right), returning two tuples.
+    ///
+    /// The element at INDEX is included in the right tuple.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing (left_exclusive, right_inclusive) where:
+    /// - `left_exclusive` contains elements [0..INDEX)
+    /// - `right_inclusive` contains elements [INDEX..]
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use typed_tuple::*;
+    /// let tuple = (1u8, 2u16, 3u32, 4u64, 5i8);
+    /// let (left, right) = TypedTuple::<TupleIndex2, u32>::split_right(tuple);
+    /// assert_eq!(left, (1u8, 2u16));
+    /// assert_eq!(right, (3u32, 4u64, 5i8));
+    /// ```
+    fn split_right(self) -> (Self::SplitLeftExclusive, Self::SplitRightInclusive);
+
+    /// Splits the tuple at INDEX (inclusive both), returning two tuples.
+    ///
+    /// The element at INDEX is included in both tuples (cloned).
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing (left_inclusive, right_inclusive) where:
+    /// - `left_inclusive` contains elements [0..=INDEX]
+    /// - `right_inclusive` contains elements [INDEX..]
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use typed_tuple::*;
+    /// let tuple = (1u8, 2u16, 3u32, 4u64, 5i8);
+    /// let (left, right) = TypedTuple::<TupleIndex2, u32>::split_inclusive(tuple);
+    /// assert_eq!(left, (1u8, 2u16, 3u32));
+    /// assert_eq!(right, (3u32, 4u64, 5i8));
+    /// ```
+    fn split_inclusive(self) -> (Self::SplitLeftInclusive, Self::SplitRightInclusive)
+    where
+        T: Clone;
 }
 
 // Generate all tuple implementations using the proc macro

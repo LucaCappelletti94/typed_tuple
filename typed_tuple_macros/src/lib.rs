@@ -1,3 +1,4 @@
+//! Proc macro to generate TypedTuple implementations for tuples up to a specified size.
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, LitInt};
@@ -38,21 +39,28 @@ pub fn generate_typed_tuple_impls(input: TokenStream) -> TokenStream {
         {
             let index_lit = syn::Index::from(index);
 
-            // Build type and index lists for pop, split_at
+            // Build type and index lists for pop and split operations
             let pop_output_types =
                 type_params.iter().enumerate().filter(|(i, _)| *i != index).map(|(_, t)| t);
             let remaining_indices = (0..size).filter(|i| *i != index).map(syn::Index::from);
 
-            let split_left_types = type_params.iter().take(index + 1);
-            let split_right_types = type_params.iter().skip(index + 1);
-            let split_left_indices = (0..=index).map(syn::Index::from);
-            let split_right_indices = ((index + 1)..size).map(syn::Index::from);
+            let split_left_exclusive_types = type_params.iter().take(index);
+            let split_left_inclusive_types = type_params.iter().take(index + 1);
+            let split_right_exclusive_types = type_params.iter().skip(index + 1);
+            let split_right_inclusive_types = type_params.iter().skip(index);
+            
+            let split_left_exclusive_indices: Vec<_> = (0..index).map(syn::Index::from).collect();
+            let split_left_inclusive_indices: Vec<_> = (0..=index).map(syn::Index::from).collect();
+            let split_right_exclusive_indices: Vec<_> = ((index + 1)..size).map(syn::Index::from).collect();
+            let split_right_inclusive_indices: Vec<_> = (index..size).map(syn::Index::from).collect();
 
             impls.push(quote! {
                 impl<#(#type_params),*> TypedTuple<#index_marker, #target_type> for (#(#type_params,)*) {
                     type PopOutput = (#(#pop_output_types,)*);
-                    type SplitLeft = (#(#split_left_types,)*);
-                    type SplitRight = (#(#split_right_types,)*);
+                    type SplitLeftExclusive = (#(#split_left_exclusive_types,)*);
+                    type SplitLeftInclusive = (#(#split_left_inclusive_types,)*);
+                    type SplitRightExclusive = (#(#split_right_exclusive_types,)*);
+                    type SplitRightInclusive = (#(#split_right_inclusive_types,)*);
                     const INDEX: usize = #index;
 
                     #[inline]
@@ -75,8 +83,24 @@ pub fn generate_typed_tuple_impls(input: TokenStream) -> TokenStream {
                         (self.#index_lit, (#(self.#remaining_indices,)*))
                     }
                     #[inline]
-                    fn split_at(self) -> (Self::SplitLeft, Self::SplitRight) {
-                        ((#(self.#split_left_indices,)*), (#(self.#split_right_indices,)*))
+                    fn split_exclusive(self) -> (Self::SplitLeftExclusive, #target_type, Self::SplitRightExclusive) {
+                        ((#(self.#split_left_exclusive_indices,)*), self.#index_lit, (#(self.#split_right_exclusive_indices,)*))
+                    }
+                    #[inline]
+                    fn split_left(self) -> (Self::SplitLeftInclusive, Self::SplitRightExclusive) {
+                        ((#(self.#split_left_inclusive_indices,)*), (#(self.#split_right_exclusive_indices,)*))
+                    }
+                    #[inline]
+                    fn split_right(self) -> (Self::SplitLeftExclusive, Self::SplitRightInclusive) {
+                        ((#(self.#split_left_exclusive_indices,)*), (#(self.#split_right_inclusive_indices,)*))
+                    }
+                    #[inline]
+                    fn split_inclusive(self) -> (Self::SplitLeftInclusive, Self::SplitRightInclusive)
+                    where
+                        #target_type: Clone
+                    {
+                        let cloned = self.#index_lit.clone();
+                        ((#(self.#split_left_inclusive_indices,)*), (cloned, #(self.#split_right_exclusive_indices,)*))
                     }
                 }
             });
