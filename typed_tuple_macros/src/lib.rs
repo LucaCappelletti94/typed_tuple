@@ -44,6 +44,28 @@ pub fn generate_index_markers(_input: TokenStream) -> TokenStream {
     .into()
 }
 
+/// Generates FirstIndex trait implementations for all tuple sizes
+#[proc_macro]
+pub fn generate_first_index_impls(_input: TokenStream) -> TokenStream {
+    let mut impls = Vec::new();
+
+    for size in 1..=MAX_SIZE {
+        let type_params: Vec<_> = (0..size).map(|i| quote::format_ident!("T{}", i)).collect();
+        let first_type = &type_params[0];
+
+        impls.push(quote! {
+            impl<#(#type_params),*> FirstIndex for (#(#type_params,)*) {
+                type FirstType = #first_type;
+            }
+        });
+    }
+
+    quote! {
+        #(#impls)*
+    }
+    .into()
+}
+
 /// Generates LastIndex trait implementations for all tuple sizes
 #[proc_macro]
 pub fn generate_last_index_impls(_input: TokenStream) -> TokenStream {

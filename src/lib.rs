@@ -120,6 +120,38 @@ pub trait TupleIndexSub<Other> {
     type Output: TupleIndex;
 }
 
+/// Trait to identify the first element type of a tuple.
+///
+/// This trait is implemented for all tuple types (by default up to size 64,
+/// and up to 128 with the `len_128` feature) and provides an associated
+/// type `FirstType` for the type of the first element. The first element
+/// is always at `TupleIndex0`.
+///
+/// # Examples
+///
+/// ```rust
+/// # use typed_tuple::*;
+/// // Access first element using FirstIndex
+/// type MyTuple = (u8, u16, u32);
+/// type FirstType = <MyTuple as FirstIndex>::FirstType;
+///
+/// let tuple: MyTuple = (1, 2, 3);
+/// let first: &FirstType = TypedTuple::<TupleIndex0, FirstType>::get(&tuple);
+/// assert_eq!(*first, 1u8);
+///
+/// // Works with different tuple sizes
+/// type BiggerTuple = (i8, u16, u32, u64, i64);
+/// type BiggerFirstType = <BiggerTuple as FirstIndex>::FirstType;
+///
+/// let tuple2: BiggerTuple = (5, 2, 3, 4, 1);
+/// let first2: &BiggerFirstType = TypedTuple::<TupleIndex0, BiggerFirstType>::get(&tuple2);
+/// assert_eq!(*first2, 5i8);
+/// ```
+pub trait FirstIndex {
+    /// The type of the first element in the tuple.
+    type FirstType;
+}
+
 /// Trait to identify the last element index of a tuple.
 ///
 /// This trait is implemented for many tuple types (by default up to size 64,
@@ -155,7 +187,9 @@ pub trait LastIndex {
 }
 
 /// Trait for tuple element manipulation by type.
-pub trait TypedTuple<Idx: TupleIndex, T>: Sized + LastIndex<Last: TupleIndexSub<Idx>> {
+pub trait TypedTuple<Idx: TupleIndex, T>:
+    Sized + LastIndex<Last: TupleIndexSub<Idx>> + FirstIndex
+{
     /// The type of the remaining tuple after popping element of type `T`.
     type PopOutput;
     /// The type of the left tuple when splitting exclusively (excludes element
@@ -166,6 +200,7 @@ pub trait TypedTuple<Idx: TupleIndex, T>: Sized + LastIndex<Last: TupleIndexSub<
     /// The type of the left tuple when splitting inclusively (includes element
     /// at INDEX): [.., INDEX].
     type SplitLeftInclusive: LastIndex<Last = Idx, LastType = T>
+        + FirstIndex<FirstType = Self::FirstType>
         + TypedTuple<
             Idx,
             T,
@@ -182,7 +217,9 @@ pub trait TypedTuple<Idx: TupleIndex, T>: Sized + LastIndex<Last: TupleIndexSub<
     type SplitRightInclusive: LastIndex<
             Last = <<Self as LastIndex>::Last as TupleIndexSub<Idx>>::Output,
             LastType = <Self as LastIndex>::LastType,
-        > + TypedTuple<
+        > + TypedFirst<T>
+        + FirstIndex<FirstType = T>
+        + TypedTuple<
             TupleIndex0,
             T,
             SplitRightExclusive = Self::SplitRightExclusive,
@@ -636,7 +673,17 @@ impl<T, TT> TypedLast<T> for TT where
 {
 }
 
+/// Trait for accessing the first element of a tuple by type.
+///
+/// This trait is implemented for tuples where the first element is of type `T`.
+/// It combines the functionality of `FirstIndex` and `TypedTuple` to provide
+/// type-safe access to the first element.
+pub trait TypedFirst<T>: FirstIndex<FirstType = T> + TypedTuple<TupleIndex0, T> {}
+
+impl<T, TT> TypedFirst<T> for TT where TT: FirstIndex<FirstType = T> + TypedTuple<TupleIndex0, T> {}
+
 typed_tuple_macros::generate_index_markers!();
+typed_tuple_macros::generate_first_index_impls!();
 typed_tuple_macros::generate_last_index_impls!();
 typed_tuple_macros::generate_index_add_impls!();
 typed_tuple_macros::generate_index_sub_impls!();
