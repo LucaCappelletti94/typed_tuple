@@ -151,7 +151,8 @@ pub fn generate_index_sub_impls(_input: TokenStream) -> TokenStream {
     .into()
 }
 
-/// Generates TupleIndexSaturatingSub trait implementations for all index combinations
+/// Generates TupleIndexSaturatingSub trait implementations for all index
+/// combinations
 #[proc_macro]
 pub fn generate_index_saturating_sub_impls(_input: TokenStream) -> TokenStream {
     let mut impls = Vec::new();
@@ -265,6 +266,126 @@ pub fn generate_typed_tuple_impls(_input: TokenStream) -> TokenStream {
 
     quote! {
         #(#impls)*
+    }
+    .into()
+}
+
+/// Generates the TupleIndex trait definition with all required
+/// TupleIndexSaturatingSub bounds
+#[proc_macro]
+pub fn define_tuple_index_trait(_input: TokenStream) -> TokenStream {
+    let mut bounds = Vec::new();
+
+    // Add the basic bounds
+    bounds.push(quote! { Sized });
+    bounds.push(quote! { TupleIndexSub<Self, Output = TupleIndex0> });
+    bounds.push(quote! { TupleIndexSub<TupleIndex0, Output = Self> });
+    bounds.push(quote! { TupleIndexAdd<TupleIndex0, Output = Self> });
+
+    // Add TupleIndexSaturatingSub bounds for all indices
+    for i in 0..MAX_SIZE {
+        let index_marker = quote::format_ident!("TupleIndex{}", i);
+        bounds.push(quote! { TupleIndexSaturatingSub<#index_marker> });
+    }
+
+    quote! {
+        /// Trait for tuple index types.
+        pub trait TupleIndex: #(#bounds)+* {
+            /// The associated index value.
+            const INDEX: usize;
+        }
+    }
+    .into()
+}
+
+/// Generates the TypedLast trait definition with all required TypedNth bounds
+#[proc_macro]
+pub fn define_typed_last_trait(_input: TokenStream) -> TokenStream {
+    let mut bounds = Vec::new();
+
+    // Add the basic bound
+    bounds.push(quote! { LastIndex<NthType = T> });
+
+    // Add TypedNth bounds for Last and Last - i for all i
+    bounds.push(quote! { TypedNth<<Self as LastIndex>::Last> });
+
+    for i in 1..MAX_SIZE {
+        let index_marker = quote::format_ident!("TupleIndex{}", i);
+        bounds.push(quote! {
+            TypedNth<<<Self as LastIndex>::Last as TupleIndexSaturatingSub<#index_marker>>::Output>
+        });
+    }
+
+    // Add the final TypedTuple bound
+    bounds.push(quote! {
+        TypedTuple<
+            <Self as LastIndex>::Last,
+            T,
+            SplitRightInclusive = (T,),
+            SplitLeftInclusive = Self,
+            SplitRightExclusive = (),
+        >
+    });
+
+    quote! {
+        /// Trait for accessing the last element of a tuple by type.
+        ///
+        /// This trait is implemented for tuples where the last element is of type `T`.
+        /// It combines the functionality of `LastIndex` and `TypedTuple` to provide
+        /// type-safe access to the last element.
+        ///
+        /// # Examples
+        ///
+        /// ```rust
+        /// # use typed_tuple::prelude::*;
+        /// fn get_last<TT: TypedLast<u32>>(tuple: &TT) -> &u32 {
+        ///     tuple.get()
+        /// }
+        ///
+        /// let tuple = (1u8, 2u16, 3u32);
+        /// assert_eq!(*get_last(&tuple), 3u32);
+        ///
+        /// let tuple2 = ("hello", 'x', 42u32);
+        /// assert_eq!(*get_last(&tuple2), 42u32);
+        /// ```
+        pub trait TypedLast<T>: #(#bounds)+* {
+        }
+    }
+    .into()
+}
+
+/// Generates the TypedLast trait implementation
+#[proc_macro]
+pub fn impl_typed_last_trait(_input: TokenStream) -> TokenStream {
+    let mut bounds = Vec::new();
+
+    // Add the basic bound
+    bounds.push(quote! { LastIndex<NthType = T> });
+
+    // Add TypedNth bounds for Last and Last - i for all i
+    bounds.push(quote! { TypedNth<<TT as LastIndex>::Last> });
+
+    for i in 1..MAX_SIZE {
+        let index_marker = quote::format_ident!("TupleIndex{}", i);
+        bounds.push(quote! {
+            TypedNth<<<TT as LastIndex>::Last as TupleIndexSaturatingSub<#index_marker>>::Output>
+        });
+    }
+
+    // Add the final TypedTuple bound
+    bounds.push(quote! {
+        TypedTuple<
+            <TT as LastIndex>::Last,
+            T,
+            SplitRightInclusive = (T,),
+            SplitLeftInclusive = TT,
+            SplitRightExclusive = (),
+        >
+    });
+
+    quote! {
+        impl<T, TT> TypedLast<T> for TT where TT: #(#bounds)+* {
+        }
     }
     .into()
 }
