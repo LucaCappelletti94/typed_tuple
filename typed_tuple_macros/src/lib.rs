@@ -91,6 +91,33 @@ pub fn generate_last_index_impls(_input: TokenStream) -> TokenStream {
     .into()
 }
 
+/// Generates NthIndex trait implementations for all tuples and valid indices
+#[proc_macro]
+pub fn generate_nth_index_impls(_input: TokenStream) -> TokenStream {
+    let mut impls = Vec::new();
+
+    for size in 1..=MAX_SIZE {
+        let type_params: Vec<_> = (0..size).map(|i| quote::format_ident!("T{}", i)).collect();
+
+        // Generate implementation for each valid index in the tuple
+        for index in 0..size {
+            let nth_type = &type_params[index];
+            let index_marker = quote::format_ident!("TupleIndex{}", index);
+
+            impls.push(quote! {
+                impl<#(#type_params),*> NthIndex<#index_marker> for (#(#type_params,)*) {
+                    type NthType = #nth_type;
+                }
+            });
+        }
+    }
+
+    quote! {
+        #(#impls)*
+    }
+    .into()
+}
+
 /// Generates TupleIndexAdd trait implementations for valid index combinations
 #[proc_macro]
 pub fn generate_index_add_impls(_input: TokenStream) -> TokenStream {
